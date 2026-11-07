@@ -1,52 +1,50 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   Code2,
   LayoutDashboard,
   ListChecks,
   History,
-  TrendingUp,
-  LogOut,
+  Trophy,
+  Settings,
 } from "lucide-react";
 
 const LINKS = [
-  { to: "/home", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/home", label: "Dashboard", icon: LayoutDashboard },
   { to: "/problems", label: "Problems", icon: ListChecks },
   { to: "/submissions", label: "Submissions", icon: History },
-  { to: "/progress", label: "Progress", icon: TrendingUp },
+  { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ];
 
-export default function MainNavbar() {
-  const navigate = useNavigate();
+const ITEM = "grid size-12 place-items-center rounded-2xl transition md:size-[68px]";
 
-  const handleLogout = () => {
-    // TODO: clear your auth state / token here
-    navigate("/");
-  };
+export default function MainNavbar() {
+  const { pathname } = useLocation();
 
   return (
     <nav
       aria-label="Main"
-      className="flex items-center justify-between gap-4 md:w-[76px] md:shrink-0 md:flex-col md:items-center"
+      className="fixed inset-x-3 bottom-3 z-50 flex items-center justify-between rounded-2xl bg-surface p-2 shadow-lg
+                 md:inset-x-auto md:bottom-16 md:left-[max(4rem,calc((100vw-1472px)/2+2rem))] md:top-16
+                 md:w-[76px] md:flex-col md:bg-transparent md:p-0 md:shadow-none"
     >
-      <div className="flex items-center gap-3 md:flex-col md:gap-6">
+      <div className="flex items-center gap-2 md:flex-col md:gap-4">
         {/* Logo */}
         <NavLink
           to="/"
-          aria-label="Home"
-          className="neu-raised-sm grid size-14 place-items-center rounded-2xl text-brand md:size-[76px]"
+          aria-label="Landing page"
+          className={`${ITEM} neu-raised-sm text-brand`}
         >
           <Code2 size={26} />
         </NavLink>
 
-        {LINKS.map(({ to, label, icon: Icon, end }) => (
+        {LINKS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
-            end={end}
             title={label}
             aria-label={label}
             className={({ isActive }) =>
-              `grid size-14 place-items-center rounded-2xl transition md:size-[76px] ${
+              `${ITEM} ${
                 isActive
                   ? "neu-inset text-brand"
                   : "text-muted hover:text-ink active:neu-inset"
@@ -58,15 +56,22 @@ export default function MainNavbar() {
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={handleLogout}
-        title="Log out"
-        aria-label="Log out"
-        className="grid size-14 place-items-center rounded-2xl text-muted transition hover:text-ink active:neu-inset md:size-[76px]"
+      {/* CHANGED: Settings replaces the Log out button.
+          Also highlighted on /profile (the Home avatar link). */}
+      <NavLink
+        to="/settings"
+        title="Settings"
+        aria-label="Settings"
+        className={({ isActive }) =>
+          `${ITEM} ${
+            isActive || pathname === "/profile"
+              ? "neu-inset text-brand"
+              : "text-muted hover:text-ink active:neu-inset"
+          }`
+        }
       >
-        <LogOut size={26} />
-      </button>
+        <Settings size={26} />
+      </NavLink>
     </nav>
   );
 }
