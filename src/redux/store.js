@@ -24,7 +24,7 @@ store.subscribe(() => {
   prevAuth = auth;
 
   if (auth.isAuthenticated) {
-    saveAuth({ user: auth.user, remember: auth.remember });
+    saveAuth({ user: auth.user, token: auth.token, remember: auth.remember });
   } else {
     clearAuth();
   }

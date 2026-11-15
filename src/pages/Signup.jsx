@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Check, Code2, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { useToast } from "../context/ToastContext";
 import { login } from "../redux/authSlice";
-import { mockSignup } from "../utils/mockAuth";
+import { signupUser } from "../services/authService";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_RE = /^[A-Za-z0-9._]{3,20}$/;
@@ -51,9 +51,13 @@ export default function Signup() {
 
     setSaving(true);
     try {
-      const user = await mockSignup(form);
+      const { token, user } = await signupUser({
+        username: form.username.trim(),
+        email: form.email.trim(),
+        password: form.password,
+      });
       showToast("Account created. Welcome to Devlog!");
-      dispatch(login({ user, remember: true }));
+      dispatch(login({ user, token, remember: true }));
       // the guard above redirects to /home
     } catch (err) {
       setServerError(err.message);

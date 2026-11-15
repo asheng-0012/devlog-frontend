@@ -18,7 +18,7 @@ export function clearAuth() {
   }
 }
 
-export function saveAuth({ user, remember }) {
+export function saveAuth({ user, token, remember }) {
   clearAuth();
   // blob: URLs (photo previews) die on refresh, so don't save them
   const safeUser = {
@@ -26,9 +26,11 @@ export function saveAuth({ user, remember }) {
     avatar: user.avatar?.startsWith("blob:") ? null : user.avatar,
   };
   try {
+    // remember me -> localStorage (survives closing the browser)
+    // otherwise   -> sessionStorage (cleared when the tab closes)
     (remember ? localStorage : sessionStorage).setItem(
       KEY,
-      JSON.stringify({ user: safeUser, remember })
+      JSON.stringify({ user: safeUser, token, remember })
     );
   } catch {
     /* storage unavailable */

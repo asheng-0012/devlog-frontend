@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Check, Code2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useToast } from "../context/ToastContext";
 import { login } from "../redux/authSlice";
-import { mockLogin } from "../utils/mockAuth";
+import { loginUser } from "../services/authService";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -46,9 +46,9 @@ export default function Login() {
 
     setSaving(true);
     try {
-      const user = await mockLogin(form.email, form.password);
+      const { token, user } = await loginUser(form.email.trim(), form.password);
       showToast(`Welcome back, ${user.name.split(" ")[0]}`);
-      dispatch(login({ user, remember }));
+      dispatch(login({ user, token, remember }));
       // the guard above redirects once isAuthenticated becomes true
     } catch (err) {
       setServerError(err.message);

@@ -9,8 +9,10 @@ import withPageShell from "../hoc/withPageShell";
 import CodeEditor from "../components/CodeEditor";
 import { useToast } from "../context/ToastContext";
 import { LANGUAGES, STARTER_CODE } from "../data/starterCode";
-import { PROBLEM_DETAILS, SOURCE_URLS } from "../data/problemDetails";
 import { mockAssess } from "../utils/mockAssess";
+import { fetchQuestion } from "../services/questionService";
+import { questionTitle } from "../utils/questionTitle";
+import { sourceName } from "../utils/sourceName";
 import { addSubmission } from "../redux/submissionsSlice";
 import { setProblemStatus } from "../redux/problemsSlice";
 
@@ -32,6 +34,25 @@ const formatTime = (s) =>
 
 const formatDate = (iso) =>
   new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+// some statements store < > & as \u003C \u003E \u0026 text, turn them back into the real characters
+const readable = (text) =>
+  (text || "")
+    .replace(/\\u003c/gi, "<")
+    .replace(/\\u003e/gi, ">")
+    .replace(/\\u0026/gi, "&");
+
+// the database shape -> the shape this page uses
+function toProblem(q) {
+  return {
+    id: q._id,
+    title: questionTitle(q.statement),
+    statement: q.statement,
+    difficulty: q.difficulty,
+    source: sourceName(q.source),
+    sourceUrl: q.sourceUrl,
+  };
+}
 
 /* ---------- Small pieces ---------- */
 // not a button: it switches by itself when the status changes
@@ -83,41 +104,12 @@ function LanguageSelect({ value, onChange, disabled }) {
   );
 }
 
+// the full problem text from the database, line breaks kept
 function Statement({ problem }) {
-  const details = PROBLEM_DETAILS[problem.id];
-
   return (
-    <div className="space-y-6 text-lg leading-relaxed">
-      <p>{details?.statement ?? problem.title}</p>
-
-      {details?.examples.map((ex, i) => (
-        <div key={i}>
-          <p className="font-semibold text-muted">Example {i + 1}:</p>
-          <p className="mt-1">Input:</p>
-          <p className="whitespace-pre-line">{ex.input}</p>
-          <p className="mt-1">Output:</p>
-          <p>{ex.output}</p>
-          {ex.explanation && <p className="mt-2 text-muted">Explanation: {ex.explanation}</p>}
-        </div>
-      ))}
-
-      {details?.constraints && (
-        <div>
-          <p className="font-semibold text-muted">Constraints:</p>
-          <ul className="mt-1 list-disc pl-6">
-            {details.constraints.map((c) => (
-              <li key={c}>{c}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {!details && (
-        <p className="text-base text-muted">
-          Examples and constraints will appear here once the backend supplies them.
-        </p>
-      )}
-    </div>
+    <p className="whitespace-pre-wrap break-words text-lg leading-relaxed">
+      {readable(problem.statement)}
+    </p>
   );
 }
 
@@ -349,19 +341,21 @@ function Solver({ problem, onRetry, initial }) {
         >
           <ArrowLeft size={24} />
         </Link>
-        <h1 className="text-emboss text-3xl font-semibold md:text-4xl">Problem #{problem.id}</h1>
+        <h1 className="text-emboss min-w-0 text-2xl font-semibold md:text-3xl">{problem.title}</h1>
         <span className={`neu-inset rounded-full px-5 py-2 text-lg ${DIFFICULTY_COLOR[problem.difficulty]}`}>
           {problem.difficulty}
         </span>
         <span className="neu-inset rounded-full px-5 py-2 text-lg text-muted">{problem.source}</span>
-        <a
-          href={SOURCE_URLS[problem.source]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-lg text-brand hover:underline"
-        >
-          <ExternalLink size={18} /> View original
-        </a>
+        {problem.sourceUrl && (
+          <a
+            href={problem.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-lg text-brand hover:underline"
+          >
+            <ExternalLink size={18} /> View original
+          </a>
+        )}
       </header>
 
       {/* ---------- Timer, language, submit ---------- */}
@@ -471,13 +465,45 @@ function Solver({ problem, onRetry, initial }) {
 function ProblemDetail() {
   const { id } = useParams();
   const { state } = useLocation(); // carries the submission from "Open in workspace"
-  const problem = useSelector((s) => s.problems.items.find((p) => p.id === Number(id)));
+
+  const [problem, setProblem] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
 
-  if (!problem) {
+  // load this one question from the server whenever the id in the address changes
+  useEffect(() => {
+    let cancelled = false; // ignore the answer if we already moved to another problem
+
+    async function load() {
+      setLoading(true);
+      setError("");
+      setProblem(null);
+      try {
+        const data = await fetchQuestion(id);
+        if (!cancelled) setProblem(toProblem(data.question || data));
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loading) {
+    return <p className="py-10 text-center text-xl text-muted">Loading problem…</p>;
+  }
+
+  if (error || !problem) {
     return (
       <div className="py-10">
         <h1 className="text-emboss text-3xl font-semibold">Problem not found</h1>
+        {error && <p className="mt-3 text-lg text-muted">{error}</p>}
         <Link to="/problems" className="mt-6 inline-block text-lg text-brand hover:underline">
           ← Back to problems
         </Link>

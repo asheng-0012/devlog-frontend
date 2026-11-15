@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, Circle, Eye, EyeOff } from "lucide-react";
 import withPageShell from "../hoc/withPageShell";
 import { useToast } from "../context/ToastContext";
-import { mockChangePassword } from "../utils/mockChangePassword";
+import { changePasswordRequest } from "../services/authService";
 
 const INPUT =
   "neu-inset w-full rounded-2xl bg-transparent py-4 pl-5 pr-14 text-lg text-ink outline-none placeholder:text-muted";
@@ -95,7 +95,7 @@ function ChangePassword() {
 
     setSaving(true);
     try {
-      await mockChangePassword(form.current, form.next);
+      await changePasswordRequest(form.current, form.next);
       showToast("Password updated");
       navigate("/settings");
     } catch (err) {

@@ -13,7 +13,8 @@ const stored = loadAuth();
 
 const initialState = {
   user: stored?.user ?? GUEST,
-  isAuthenticated: Boolean(stored?.user),
+  token: stored?.token ?? null,
+  isAuthenticated: Boolean(stored?.token),
   remember: stored?.remember ?? false,
 };
 
@@ -23,6 +24,7 @@ const authSlice = createSlice({
   reducers: {
     login(state, action) {
       state.user = action.payload.user;
+      state.token = action.payload.token;
       state.remember = action.payload.remember;
       state.isAuthenticated = true;
     },
@@ -30,6 +32,8 @@ const authSlice = createSlice({
       state.user = { ...state.user, ...action.payload };
     },
     logout(state) {
+      state.user = GUEST;
+      state.token = null;
       state.isAuthenticated = false;
     },
   },

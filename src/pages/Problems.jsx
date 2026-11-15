@@ -1,14 +1,14 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   CheckCircle2, CircleDot, Circle,
-  ChevronDown, ChevronLeft, ChevronRight, X,
+  ChevronDown, ChevronLeft, ChevronRight, Search, X,
 } from "lucide-react";
 import withPageShell from "../hoc/withPageShell";
-import { SOURCES, TOPICS } from "../data/mockProblems";
 import {
-  setDifficulty, setTopic, setStatus, setSource, setPage, resetFilters,
+  setDifficulty, setTopic, setStatus, setSource, setSearch, setPage, resetFilters,
+  loadQuestions, loadTags, loadSources,
 } from "../redux/problemsSlice";
 
 const PAGE_SIZE = 15;
@@ -122,40 +122,15 @@ function Problems() {
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q")?.trim() ?? "";
 
-  const { items, filters } = useSelector((state) => state.problems);
+  // what the user is typing right now (the address bar only updates after a short pause)
+  const [text, setText] = useState(q);
 
-  const solvedCount = useMemo(
-    () => items.filter((p) => p.status === "Solved").length,
-    [items]
-  );
+  const { items, total, pages, topics, sourceCounts, filters, loading, error } =
+    useSelector((state) => state.problems);
 
-  // everything EXCEPT source, so the source chips can show matching counts
-  const baseList = useMemo(() => {
-    const needle = q.toLowerCase();
-    return items.filter(
-      (p) =>
-        (filters.difficulty === "All" || p.difficulty === filters.difficulty) &&
-        (filters.topic === "All" || p.topic === filters.topic) &&
-        (filters.status === "All" || p.status === filters.status) &&
-        (!needle || `${p.title} ${p.topic} ${p.source}`.toLowerCase().includes(needle))
-    );
-  }, [items, filters.difficulty, filters.topic, filters.status, q]);
-
-  const sourceCounts = useMemo(() => {
-    const counts = { All: baseList.length };
-    SOURCES.forEach((s) => (counts[s] = 0));
-    baseList.forEach((p) => counts[p.source]++);
-    return counts;
-  }, [baseList]);
-
-  const filtered = useMemo(
-    () => (filters.source === "All" ? baseList : baseList.filter((p) => p.source === filters.source)),
-    [baseList, filters.source]
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const page = Math.min(filters.page, totalPages);
-  const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const page = filters.page;
+  const sourceNames = Object.keys(sourceCounts);
+  const allCount = Object.values(sourceCounts).reduce((sum, n) => sum + n, 0);
 
   const hasFilters =
     q ||
@@ -166,8 +141,56 @@ function Problems() {
 
   const clearAll = () => {
     dispatch(resetFilters());
+    setText("");
     setSearchParams({});
   };
+
+  // put the search text into the address bar (?q=)
+  const applySearch = (value) => {
+    const trimmed = value.trim();
+    setSearchParams(trimmed ? { q: trimmed } : {}, { replace: true });
+  };
+
+  const clearSearch = () => {
+    setText("");
+    setSearchParams({}, { replace: true });
+  };
+
+  // topics + source counts are loaded once
+  useEffect(() => {
+    dispatch(loadTags());
+    dispatch(loadSources());
+  }, [dispatch]);
+
+  // if ?q= changes from outside (Home page link, Clear filters), update the input
+  useEffect(() => {
+    setText(q);
+  }, [q]);
+
+  // wait 400ms after the user stops typing, then search
+  useEffect(() => {
+    if (text.trim() === q) return;
+    const timer = setTimeout(() => applySearch(text), 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, q]);
+
+  // copy the ?q= text from the address bar into the store
+  useEffect(() => {
+    if (q !== filters.search) dispatch(setSearch(q));
+  }, [q, filters.search, dispatch]);
+
+  // load one page from the server whenever a filter or the page changes
+  useEffect(() => {
+    dispatch(loadQuestions());
+  }, [
+    dispatch,
+    filters.difficulty,
+    filters.topic,
+    filters.source,
+    filters.search,
+    filters.page,
+  ]);
 
   // jump back to the top when the page changes
   useEffect(() => {
@@ -179,13 +202,41 @@ function Problems() {
       {/* ---------- Header ---------- */}
       <header className="flex flex-wrap items-baseline justify-between gap-4">
         <h1 className="text-emboss text-3xl font-semibold md:text-4xl">Problems</h1>
-        <p className="text-lg text-muted">
-          {solvedCount} of {items.length} solved
-        </p>
+        <p className="text-lg text-muted">{total} problems</p>
       </header>
 
+      {/* ---------- Search ---------- */}
+      <form
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          applySearch(text); // Enter searches right away
+        }}
+        className="neu-inset mt-8 flex h-16 items-center gap-4 rounded-full px-7 focus-within:ring-2 focus-within:ring-brand"
+      >
+        <Search size={22} className="shrink-0 text-muted" />
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Search problems…"
+          aria-label="Search problems"
+          className="min-w-0 flex-1 bg-transparent text-lg text-ink outline-none placeholder:text-muted"
+        />
+        {text && (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={clearSearch}
+            className="shrink-0 text-muted transition hover:text-ink"
+          >
+            <X size={20} />
+          </button>
+        )}
+      </form>
+
       {/* ---------- Filters ---------- */}
-      <div className="mt-8 flex flex-wrap items-center gap-5">
+      <div className="mt-6 flex flex-wrap items-center gap-5">
         {/* difficulty tabs */}
         <div role="group" aria-label="Difficulty" className="neu-inset flex h-16 items-center gap-1 rounded-full p-2">
           {DIFFICULTIES.map((d) => (
@@ -208,7 +259,7 @@ function Problems() {
         <Dropdown
           label="Topic"
           value={filters.topic}
-          options={["All", ...TOPICS]}
+          options={["All", ...topics]}
           onChange={(v) => dispatch(setTopic(v))}
         />
         <Dropdown
@@ -217,21 +268,12 @@ function Problems() {
           options={STATUSES}
           onChange={(v) => dispatch(setStatus(v))}
         />
-
-        {q && (
-          <span className="neu-inset inline-flex h-12 items-center gap-3 rounded-full px-5 text-brand">
-            Search: “{q}”
-            <button type="button" aria-label="Clear search" onClick={() => setSearchParams({})}>
-              <X size={16} />
-            </button>
-          </span>
-        )}
       </div>
 
       {/* ---------- Source chips ---------- */}
       <p className="mt-8 text-lg text-muted">Source</p>
       <div className="mt-4 flex flex-wrap gap-4">
-        {["All", ...SOURCES].map((s) => (
+        {["All", ...sourceNames].map((s) => (
           <button
             key={s}
             type="button"
@@ -241,14 +283,27 @@ function Problems() {
               filters.source === s ? "text-brand" : "text-muted hover:text-ink"
             }`}
           >
-            {s} <span className="ml-1">{sourceCounts[s]}</span>
+            {s} <span className="ml-1">{s === "All" ? allCount : sourceCounts[s]}</span>
           </button>
         ))}
       </div>
 
       {/* ---------- List ---------- */}
       <section className="neu-raised mt-8 rounded-[32px] p-6 md:p-8">
-        {visible.length === 0 ? (
+        {error ? (
+          <div className="py-10 text-center">
+            <p className="text-xl text-red-700">{error}</p>
+            <button
+              type="button"
+              onClick={() => dispatch(loadQuestions())}
+              className="neu-raised-sm mt-6 h-12 rounded-full px-8 text-lg text-brand"
+            >
+              Try again
+            </button>
+          </div>
+        ) : items.length === 0 && loading ? (
+          <p className="py-10 text-center text-xl text-muted">Loading problems…</p>
+        ) : items.length === 0 ? (
           <div className="py-10 text-center">
             <p className="text-xl">No problems match your filters</p>
             {hasFilters && (
@@ -262,9 +317,9 @@ function Problems() {
             )}
           </div>
         ) : (
-          <ul className="divide-y divide-track">
-            {visible.map(({ id, title, source, difficulty, status }) => {
-              const { Icon, className } = STATUS_ICON[status];
+          <ul className={`divide-y divide-track transition-opacity ${loading ? "opacity-50" : ""}`}>
+            {items.map(({ id, title, source, difficulty, status }, index) => {
+              const { Icon, className } = STATUS_ICON[status] || STATUS_ICON.Todo;
               return (
                 <li key={id}>
                   <Link to={`/problems/${id}`} className="group flex items-center gap-4 py-5 text-lg md:gap-6">
@@ -272,7 +327,10 @@ function Problems() {
                       <Icon size={22} />
                       <span className="sr-only">{status}</span>
                     </span>
-                    <span className="w-12 shrink-0 font-semibold">#{id}</span>
+                    {/* the real id is a long database id, so show the row number instead */}
+                    <span className="w-14 shrink-0 font-semibold">
+                      #{(page - 1) * PAGE_SIZE + index + 1}
+                    </span>
                     <span className="min-w-0 flex-1 truncate transition group-hover:text-brand">
                       {title}
                     </span>
@@ -288,7 +346,7 @@ function Problems() {
         )}
       </section>
 
-      <Pagination page={page} totalPages={totalPages} onChange={(p) => dispatch(setPage(p))} />
+      <Pagination page={page} totalPages={pages} onChange={(p) => dispatch(setPage(p))} />
     </div>
   );
 }
