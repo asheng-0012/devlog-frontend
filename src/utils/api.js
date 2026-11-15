@@ -2,7 +2,7 @@ import axios from "axios";
 import { loadAuth, clearAuth } from "./authStorage";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
 });
 
 // before every request: add the token if we have one
