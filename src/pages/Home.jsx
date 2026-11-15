@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Search } from "lucide-react";
 import withPageShell from "../hoc/withPageShell";
+import { loadDashboard } from "../redux/dashboardSlice";
 
 const DAILY_GOAL = 5; // problems per day
 
@@ -13,10 +14,15 @@ const getInitials = (name = "") =>
   name.split(" ").filter(Boolean).map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
 function Home() {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
-  const { stats, week, recent, recommended } = useSelector((state) => state.dashboard);
+  const { stats, week, recent } = useSelector((state) => state.dashboard);
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    dispatch(loadDashboard());
+  }, [dispatch]);
 
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
@@ -31,12 +37,6 @@ function Home() {
     e.preventDefault();
     const q = query.trim();
     navigate(q ? `/problems?q=${encodeURIComponent(q)}` : "/problems");
-  };
-
-  const solveRandom = () => {
-    if (!recommended.length) return;
-    const pick = recommended[Math.floor(Math.random() * recommended.length)];
-    navigate(`/problems/${pick.id}`);
   };
 
   return (
@@ -88,97 +88,68 @@ function Home() {
         ))}
       </section>
 
-      {/* ---------- Main grid ---------- */}
-      <div className="mt-8 grid items-start gap-8 lg:grid-cols-[1.35fr_1fr]">
-        {/* Left column */}
-        <div className="space-y-8">
-          {/* This week */}
-          <section className="neu-raised rounded-[32px] p-6 md:p-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-medium">This week</h2>
-              <span className="text-muted">Goal: {DAILY_GOAL} / day</span>
-            </div>
+      {/* ---------- Main section ---------- */}
+      <div className="mt-8 space-y-8">
+        {/* This week */}
+        <section className="neu-raised rounded-[32px] p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-medium">This week</h2>
+            <span className="text-muted">Goal: {DAILY_GOAL} / day</span>
+          </div>
 
-            <div className="mt-6 flex justify-between gap-2">
-              {week.map(({ day, solved }, i) => {
-                const pct = Math.min(100, (solved / DAILY_GOAL) * 100);
-                return (
-                  <div key={i} className="flex flex-col items-center gap-3">
+          <div className="mt-6 flex justify-between gap-2">
+            {week.map(({ day, solved }, i) => {
+              const pct = Math.min(100, (solved / DAILY_GOAL) * 100);
+              return (
+                <div key={i} className="flex flex-col items-center gap-3">
+                  <div
+                    className="neu-inset flex h-[120px] w-8 items-end overflow-hidden rounded-full"
+                    role="img"
+                    title={`${solved} solved`}
+                    aria-label={`${day}: ${solved} of ${DAILY_GOAL} problems solved`}
+                  >
                     <div
-                      className="neu-inset flex h-[120px] w-8 items-end overflow-hidden rounded-full"
-                      role="img"
-                      title={`${solved} solved`}
-                      aria-label={`${day}: ${solved} of ${DAILY_GOAL} problems solved`}
-                    >
-                      <div
-                        className="w-full rounded-full bg-brand transition-[height] duration-500"
-                        style={{ height: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="text-lg text-muted">{day}</span>
+                      className="w-full rounded-full bg-brand transition-[height] duration-500"
+                      style={{ height: `${pct}%` }}
+                    />
                   </div>
-                );
-              })}
-            </div>
-          </section>
+                  <span className="text-lg text-muted">{day}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-          {/* Recent submissions */}
-          <section className="neu-raised rounded-[32px] p-6 md:p-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-medium">Recent submissions</h2>
-              <Link to="/submissions" className="text-lg text-brand hover:underline">
-                View all
-              </Link>
-            </div>
+        {/* Recent submissions */}
+        <section className="neu-raised rounded-[32px] p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-medium">Recent submissions</h2>
+            <Link to="/submissions" className="text-lg text-brand hover:underline">
+              View all
+            </Link>
+          </div>
 
-            {recent.length === 0 ? (
-              <p className="mt-6 text-lg text-muted">No submissions yet. Solve your first problem!</p>
-            ) : (
-              <ul className="mt-6 space-y-4">
-                {recent.map(({ id, title, language, correctness }) => (
-                  <li key={id}>
-                    <Link
-                      to={`/problems/${id}`}
-                      className="neu-inset flex h-[76px] items-center gap-4 rounded-full px-6 text-lg"
-                    >
-                      <span className="flex-1 truncate font-medium">{title}</span>
-                      <span className="hidden w-28 text-muted sm:block">{language}</span>
-                      <span className={`w-14 text-right font-semibold ${scoreColor(correctness)}`}>
-                        {correctness}%
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
-
-        {/* Right column */}
-        <aside className="neu-raised rounded-[32px] p-6 md:p-8">
-          <h2 className="text-xl font-medium">Recommended for you</h2>
-
-          <ul className="mt-6 space-y-4">
-            {recommended.map(({ id, title, difficulty, topic }) => (
-              <li key={id}>
-                <Link to={`/problems/${id}`} className="neu-inset block rounded-3xl px-6 py-5">
-                  <p className="text-lg font-medium">{title}</p>
-                  <p className="mt-1 text-muted">
-                    {difficulty} · {topic}
-                  </p>
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          <button
-            type="button"
-            onClick={solveRandom}
-            className="neu-brand mt-6 h-[72px] w-full rounded-3xl text-lg font-semibold text-white transition active:translate-y-px"
-          >
-            Solve a random one
-          </button>
-        </aside>
+          {recent.length === 0 ? (
+            <p className="mt-6 text-lg text-muted">No submissions yet. Solve your first problem!</p>
+          ) : (
+            <ul className="mt-6 space-y-4">
+              {recent.map(({ id, title, language, correctness }) => (
+                <li key={id}>
+                  <Link
+                    to={`/problems/${id}`}
+                    className="neu-inset flex h-[76px] items-center gap-4 rounded-full px-6 text-lg"
+                  >
+                    <span className="flex-1 truncate font-medium">{title}</span>
+                    <span className="hidden w-28 text-muted sm:block">{language}</span>
+                    <span className={`w-14 text-right font-semibold ${scoreColor(correctness)}`}>
+                      {correctness}%
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );

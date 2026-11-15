@@ -10,6 +10,8 @@ import CodeEditor from "../components/CodeEditor";
 import { useToast } from "../context/ToastContext";
 import { LANGUAGES, STARTER_CODE } from "../data/starterCode";
 import { mockAssess } from "../utils/mockAssess";
+import { assessSolution } from "../services/assessmentService";
+import { saveSubmission } from "../services/submissionService";
 import { fetchQuestion } from "../services/questionService";
 import { questionTitle } from "../utils/questionTitle";
 import { sourceName } from "../utils/sourceName";
@@ -182,6 +184,17 @@ function AssessmentCard({ status, result }) {
           </div>
 
           <p className="neu-inset mt-6 rounded-3xl p-5 text-lg leading-relaxed">{result.feedback}</p>
+
+          {result.improvements && result.improvements.length > 0 && (
+            <div className="neu-inset mt-4 rounded-3xl p-5">
+              <h3 className="text-base font-semibold text-brand mb-2">Key Improvements suggested by Gemini Instructor:</h3>
+              <ul className="list-disc list-inside space-y-1 text-sm text-ink/80">
+                {result.improvements.map((item, idx) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       ) : (
         <div className="mt-6 flex items-center gap-6">
@@ -286,21 +299,62 @@ function Solver({ problem, onRetry, initial }) {
     if (auto) showToast("Time's up. Submitting your code…");
     setStatus("submitting");
 
-    const assessment = await mockAssess({ code, language });
+    let assessment;
+    try {
+      // Try Gemini AI assessment first
+      assessment = await assessSolution({
+        problemStatement: problem.statement,
+        language,
+        code,
+      });
+    } catch {
+      // Gracefully fall back to local mock assessment if API key or backend network is unavailable
+      assessment = await mockAssess({ code, language });
+    }
+
     setResult(assessment);
     setStatus("submitted");
 
-    dispatch(
-      addSubmission({
-        id: Date.now(),
+    // Save to MongoDB backend and update local Redux store
+    try {
+      const savedDoc = await saveSubmission({
         problemId: problem.id,
         title: problem.title,
         language,
         code,
-        ...assessment,
-        createdAt: new Date().toISOString(),
-      })
-    );
+        correctness: assessment.correctness,
+        points: assessment.points || 0,
+        timeComplexity: assessment.timeComplexity,
+        spaceComplexity: assessment.spaceComplexity,
+        feedback: assessment.feedback,
+        improvements: assessment.improvements || [],
+      });
+
+      dispatch(
+        addSubmission({
+          id: savedDoc._id || Date.now(),
+          problemId: problem.id,
+          title: problem.title,
+          language,
+          code,
+          ...assessment,
+          createdAt: savedDoc.createdAt || new Date().toISOString(),
+        })
+      );
+    } catch {
+      dispatch(
+        addSubmission({
+          id: Date.now(),
+          problemId: problem.id,
+          title: problem.title,
+          language,
+          code,
+          ...assessment,
+          createdAt: new Date().toISOString(),
+        })
+      );
+    }
+
     dispatch(
       setProblemStatus({
         id: problem.id,

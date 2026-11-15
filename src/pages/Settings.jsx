@@ -5,6 +5,7 @@ import { LogOut } from "lucide-react";
 import withPageShell from "../hoc/withPageShell";
 import { useToast } from "../context/ToastContext";
 import { updateProfile, logout } from "../redux/authSlice";
+import { updateProfileRequest } from "../services/authService";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -65,7 +66,7 @@ function Settings() {
     set("avatar", URL.createObjectURL(file));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setTried(true);
     if (errors.name || errors.email) return;
     const clean = {
@@ -74,10 +75,15 @@ function Settings() {
       email: draft.email.trim(),
       bio: draft.bio.trim(),
     };
-    dispatch(updateProfile(clean));
-    setDraft(clean);
-    setTried(false);
-    showToast("Changes saved");
+    try {
+      const updatedUser = await updateProfileRequest(clean);
+      dispatch(updateProfile(updatedUser));
+      setDraft(pick(updatedUser));
+      setTried(false);
+      showToast("Changes saved successfully");
+    } catch (err) {
+      showToast(err.message || "Failed to save profile");
+    }
   };
 
   const handleCancel = () => {

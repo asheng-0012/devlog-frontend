@@ -30,7 +30,7 @@ export default function MainNavbar() {
       <div className="flex items-center gap-2 md:flex-col md:gap-4">
         {/* Logo */}
         <NavLink
-          to="/"
+          to="/home"
           aria-label="Landing page"
           className={`${ITEM} neu-raised-sm text-brand`}
         >

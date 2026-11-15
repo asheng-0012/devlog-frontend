@@ -34,3 +34,12 @@ export async function changePasswordRequest(currentPassword, newPassword) {
     fail(error);
   }
 }
+
+export async function updateProfileRequest(data) {
+  try {
+    const res = await api.put("/api/auth/profile", data);
+    return res.data; // updated user
+  } catch (error) {
+    fail(error);
+  }
+}

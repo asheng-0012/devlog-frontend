@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { ChevronDown, MessageSquareText } from "lucide-react";
 import withPageShell from "../hoc/withPageShell";
 import { highlight } from "../components/CodeEditor";
+import { loadSubmissions } from "../redux/submissionsSlice";
 
 const scoreText = (s) => (s >= 80 ? "text-brand" : s >= 60 ? "text-amber-700" : "text-red-700");
 const scoreBar = (s) => (s >= 80 ? "bg-brand" : s >= 60 ? "bg-amber-700" : "bg-red-700");
@@ -65,8 +66,13 @@ function Details({ submission, id }) {
 
 /* ---------- Page ---------- */
 function Submissions() {
+  const dispatch = useDispatch();
   const items = useSelector((state) => state.submissions.items);
   const [openId, setOpenId] = useState(items[0]?.id ?? null);
+
+  useEffect(() => {
+    dispatch(loadSubmissions());
+  }, [dispatch]);
 
   const average = useMemo(
     () => (items.length ? Math.round(items.reduce((sum, s) => sum + s.correctness, 0) / items.length) : 0),
