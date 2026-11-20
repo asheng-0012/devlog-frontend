@@ -2,11 +2,17 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Code2, Menu, X } from "lucide-react";
 
+// Problems uses React Router (protected page — redirects to login if not signed in)
+// Features scrolls to the section on the landing page
 const NAV_LINKS = [
-  { label: "Problems", href: "#problems" },
-  { label: "Features", href: "#features" },
-  { label: "How it works", href: "#how-it-works" },
+  { label: "Features", href: "#features", anchor: true },
 ];
+
+// smooth scroll helper so the Features anchor doesn't hard-jump
+function scrollToFeatures(e) {
+  e.preventDefault();
+  document.querySelector("#features")?.scrollIntoView({ behavior: "smooth" });
+}
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -25,11 +31,8 @@ export default function Navbar() {
 
         {/* Desktop nav links */}
         <nav className="hidden gap-10 text-xl text-muted lg:flex">
-          {NAV_LINKS.map(({ label, href }) => (
-            <a key={label} href={href} className="hover:text-ink transition-colors">
-              {label}
-            </a>
-          ))}
+          <Link to="/problems" className="hover:text-ink transition-colors">Problems</Link>
+          <a href="#features" onClick={scrollToFeatures} className="hover:text-ink transition-colors">Features</a>
         </nav>
 
         {/* Right side: auth buttons + hamburger */}
@@ -58,16 +61,20 @@ export default function Navbar() {
       {/* Mobile dropdown menu */}
       {menuOpen && (
         <nav className="neu-inset mt-4 flex flex-col gap-1 rounded-2xl p-4 lg:hidden">
-          {NAV_LINKS.map(({ label, href }) => (
-            <a
-              key={label}
-              href={href}
-              className="rounded-xl px-4 py-3 text-lg text-muted hover:text-ink transition-colors"
-              onClick={() => setMenuOpen(false)}
-            >
-              {label}
-            </a>
-          ))}
+          <Link
+            to="/problems"
+            className="rounded-xl px-4 py-3 text-lg text-muted hover:text-ink transition-colors"
+            onClick={() => setMenuOpen(false)}
+          >
+            Problems
+          </Link>
+          <a
+            href="#features"
+            className="rounded-xl px-4 py-3 text-lg text-muted hover:text-ink transition-colors"
+            onClick={(e) => { scrollToFeatures(e); setMenuOpen(false); }}
+          >
+            Features
+          </a>
         </nav>
       )}
     </header>
